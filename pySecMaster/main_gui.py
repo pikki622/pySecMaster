@@ -137,15 +137,11 @@ class MainWindow(QtGui.QMainWindow):
                 event.accept()
             else:
                 event.ignore()
-        else:
-            # Request originated from a specific exit feature
-            if reply == QtGui.QMessageBox.Yes:
-                self.save_settings(ini_name)
-                sys.exit()
-            elif reply == QtGui.QMessageBox.No:
-                sys.exit()
-            else:
-                pass
+        elif reply == QtGui.QMessageBox.Yes:
+            self.save_settings(ini_name)
+            sys.exit()
+        elif reply == QtGui.QMessageBox.No:
+            sys.exit()
 
     def data_provider_toggle(self):
         """
@@ -171,11 +167,9 @@ class MainWindow(QtGui.QMainWindow):
             if provider_selected == 'google':
                 google_intervals = ['daily', 'minute']
                 self.cmb_data_interval.addItems(google_intervals)
-                self.cmb_data_interval.setCurrentIndex(0)
             else:
                 self.cmb_data_interval.addItems(intervals)
-                self.cmb_data_interval.setCurrentIndex(0)
-
+            self.cmb_data_interval.setCurrentIndex(0)
         elif provider_selected == 'quandl':
             # Downloading quandl data; hide all Google Fin options
             self.lbl_quandlkey.show()
@@ -205,15 +199,6 @@ class MainWindow(QtGui.QMainWindow):
         # The selected provider
         provider_selected = self.cmb_data_source.currentText()
 
-        # The data selections for the currently selected data provider.
-        google_fin_possible_selections = ['all', 'us_main',
-                                          'us_main_no_end_date',
-                                          'us_canada_london']
-        google_default_selection = 1
-
-        yahoo_fin_possible_selections = ['all', 'us_main',
-                                         'us_main_no_end_date',
-                                         'us_canada_london']
         yahoo_default_selection = 2
 
         quandl_possible_selections = ['wiki', 'goog', 'goog_us_main',
@@ -222,8 +207,20 @@ class MainWindow(QtGui.QMainWindow):
         quandl_default_selection = 0
 
         self.cmb_data_selection.clear()
+        yahoo_fin_possible_selections = [
+            'all',
+            'us_main',
+            'us_main_no_end_date',
+            'us_canada_london',
+        ]
         if provider_selected == 'google':
+            # The data selections for the currently selected data provider.
+            google_fin_possible_selections = ['all', 'us_main',
+                                              'us_main_no_end_date',
+                                              'us_canada_london']
             self.cmb_data_selection.addItems(google_fin_possible_selections)
+            google_default_selection = 1
+
             self.cmb_data_selection.setCurrentIndex(google_default_selection)
         elif provider_selected == 'yahoo':
             self.cmb_data_selection.addItems(yahoo_fin_possible_selections)
@@ -232,9 +229,9 @@ class MainWindow(QtGui.QMainWindow):
             self.cmb_data_selection.addItems(quandl_possible_selections)
             self.cmb_data_selection.setCurrentIndex(quandl_default_selection)
         else:
-            raise NotImplementedError('%s is not implemented in the '
-                                      'data_selection_toggle function within '
-                                      'main_gui.py' % provider_selected)
+            raise NotImplementedError(
+                f'{provider_selected} is not implemented in the data_selection_toggle function within main_gui.py'
+            )
 
     def onDataReady(self, string):
         """
@@ -254,11 +251,10 @@ class MainWindow(QtGui.QMainWindow):
         :param url: String of the url
         """
 
-        print('Opening %s in the default browser' % (url,))
+        print(f'Opening {url} in the default browser')
         q_url = QtCore.QUrl(url)
         if not QtGui.QDesktopServices.openUrl(q_url):
-            QtGui.QMessageBox.warning(self, 'Open Url',
-                                      'Could not open %s' % url)
+            QtGui.QMessageBox.warning(self, 'Open Url', f'Could not open {url}')
 
     def process(self):
         """
@@ -381,7 +377,7 @@ class MainWindow(QtGui.QMainWindow):
                 name = obj.objectName()
                 value = str(settings.value(name))   # .toString())
 
-                if value == "":
+                if not value:
                     continue
 
                 # Get the corresponding index for specified string in combobox
@@ -390,10 +386,7 @@ class MainWindow(QtGui.QMainWindow):
                 if index == -1:
                     obj.insertItems(0, [value])
                     index = obj.findText(value)
-                    obj.setCurrentIndex(index)
-                else:
-                    obj.setCurrentIndex(index)
-
+                obj.setCurrentIndex(index)
             elif isinstance(obj, QtGui.QLineEdit):
                 name = obj.objectName()
                 value = str(settings.value(name))
@@ -406,8 +399,7 @@ class MainWindow(QtGui.QMainWindow):
 
             elif isinstance(obj, QtGui.QCheckBox):
                 name = obj.objectName()
-                value = settings.value(name)
-                if value:
+                if value := settings.value(name):
                     obj.setChecked(value)   # setCheckState enables tristate
 
     def save_settings(self, ini_name):
@@ -455,9 +447,9 @@ class MainWindow(QtGui.QMainWindow):
         DEPRECIATED
         """
 
-        db_dir = QtGui.QFileDialog.getExistingDirectory(self,
-                                                        'Select Directory')
-        if db_dir:
+        if db_dir := QtGui.QFileDialog.getExistingDirectory(
+            self, 'Select Directory'
+        ):
             self.lineedit_dbdir.setText(db_dir)
 
     def select_restore(self):
@@ -466,9 +458,9 @@ class MainWindow(QtGui.QMainWindow):
         the gui settings with the values from the selected ini file.
         """
 
-        file = QtGui.QFileDialog.getOpenFileName(self, 'Select Saved Settings',
-                                                 '', 'INI (*.ini)')
-        if file:
+        if file := QtGui.QFileDialog.getOpenFileName(
+            self, 'Select Saved Settings', '', 'INI (*.ini)'
+        ):
             self.restore_settings(file)
 
     def txtbrwsr_details_toggle(self):

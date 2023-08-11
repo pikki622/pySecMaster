@@ -39,7 +39,7 @@ def query_existing_tsids(db_location, table, verbose=False):
 
     start_time = time.time()
     if verbose:
-        print('Retrieving the tsids from %s...' % db_location)
+        print(f'Retrieving the tsids from {db_location}...')
 
     conn = sqlite3.connect(db_location)
     try:
@@ -49,8 +49,7 @@ def query_existing_tsids(db_location, table, verbose=False):
                     FROM %s
                     GROUP BY tsid""" % table
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['tsid'])
                 if verbose:
                     print('The query of the existing tsids for %s took %0.1f '
@@ -77,7 +76,7 @@ def query_tsid_data(db_location, table, tsid, verbose=False):
 
     start_time = time.time()
     if verbose:
-        print('Retrieving all the %s data for %s...' % (table, tsid))
+        print(f'Retrieving all the {table} data for {tsid}...')
 
     conn = sqlite3.connect(db_location)
     try:
@@ -87,8 +86,7 @@ def query_tsid_data(db_location, table, tsid, verbose=False):
                     FROM %s
                     WHERE tsid='%s'""" % (table, tsid)
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 minute_prices_col = ['minute_price_id', 'data_vendor_id',
                                      'tsid', 'date', 'close', 'high', 'low',
                                      'open', 'volume', 'updated_date']
@@ -107,8 +105,7 @@ def query_tsid_data(db_location, table, tsid, verbose=False):
                                   'SQL query in query_tsid_data')
     except sqlite3.Error as e:
         conn.rollback()
-        print('Failed to query the price data from %s within query_tsid_data' %
-              table)
+        print(f'Failed to query the price data from {table} within query_tsid_data')
         print(e)
     except conn.OperationalError:
         print('Unable to connect to the SQL Database in query_tsid_data. Make '
@@ -274,9 +271,7 @@ def update_db_times(db_location, table, price_df):
 
         min_price_id = row['minute_price_id']
         date = row['date'].isoformat()
-        updated_date = row['updated_date']
-
-        if updated_date:
+        if updated_date := row['updated_date']:
             # Only update the database time if the existing time was updated,
             #   which is indicated by the updated_date variable not being None
 
@@ -291,20 +286,21 @@ def update_db_times(db_location, table, price_df):
                     conn.commit()
             except sqlite3.Error as e:
                 conn.rollback()
-                raise SystemError('Failed to update the times in %s within '
-                                  'update_db_times because of %s' % (table, e))
+                raise SystemError(
+                    f'Failed to update the times in {table} within update_db_times because of {e}'
+                )
             except conn.OperationalError:
                 raise SystemError('Unable to connect to the SQL Database in '
                                   'update_db_times. Make sure the database '
                                   'address/name are correct.')
             except Exception as e:
-                raise SystemError('Error occurred in update_db_times: %s' % e)
+                raise SystemError(f'Error occurred in update_db_times: {e}')
 
 
 def df_to_sql(db_location, df, sql_table, exists, item, verbose=False):
 
     if verbose:
-        print('Entering the data for %s into %s.' % (item, sql_table))
+        print(f'Entering the data for {item} into {sql_table}.')
 
     conn = sqlite3.connect(db_location)
     # Try and except block writes the new data to the SQL Database.
@@ -314,17 +310,17 @@ def df_to_sql(db_location, df, sql_table, exists, item, verbose=False):
         conn.execute("PRAGMA journal_mode = MEMORY")
         conn.execute("PRAGMA busy_timeout = 60000")
         if verbose:
-            print('Successfully entered %s into %s' % (item, sql_table))
+            print(f'Successfully entered {item} into {sql_table}')
     except conn.Error:
         conn.rollback()
-        print("Failed to insert the DataFrame into %s for %s" %
-              (sql_table, item))
+        print(f"Failed to insert the DataFrame into {sql_table} for {item}")
     except conn.OperationalError:
         raise ValueError('Unable to connect to the SQL Database in df_to_sql. '
                          'Make sure the database address/name are correct.')
     except Exception as e:
-        print('Error: Unknown issue when adding the DataFrame for %s to %s' %
-              (item, sql_table))
+        print(
+            f'Error: Unknown issue when adding the DataFrame for {item} to {sql_table}'
+        )
         print(e)
 
 
@@ -381,7 +377,7 @@ def insert_df_to_db(db_location, price_df, table, verbose=False):
                           'insert_df_to_db. Make sure the database '
                           'address/name are correct.')
     except Exception as e:
-        raise SystemError('Error occurred in insert_df_to_db: %s' % e)
+        raise SystemError(f'Error occurred in insert_df_to_db: {e}')
 
     # If there is existing data and the new data's date range is more extensive
     #   than the stored data, delete the old data and add the new data
@@ -402,13 +398,9 @@ def insert_df_to_db(db_location, price_df, table, verbose=False):
                 # Delete was successful, so insert the new data into the table
                 df_to_sql(df=price_df, db_location=db_location, sql_table=table,
                           exists='append', item=tsid, verbose=False)
-            elif del_success == 'failure':
-                # delete_sql_table_rows will issue a failure notice
-                pass
-        else:
-            if verbose:
-                print('Not inserting data for %s because duplicate data was '
-                      'found in the database' % tsid)
+        elif verbose:
+            print('Not inserting data for %s because duplicate data was '
+                  'found in the database' % tsid)
     else:
         # There is no existing data for this ticker, so insert the data
         df_to_sql(df=price_df, db_location=db_location, sql_table=table,

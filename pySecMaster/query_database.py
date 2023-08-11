@@ -56,8 +56,7 @@ def query_entire_table(database, user, password, host, port, table):
                          LIMIT 1) AS prices""" %
                      (table,))
             cur.execute(query)
-            rows = cur.fetchall()
-            if rows:
+            if rows := cur.fetchall():
                 df = pd.DataFrame(rows)
             else:
                 raise SystemExit('No data returned from query_entire_table')

@@ -42,7 +42,7 @@ class DatabaseCreationTests(unittest.TestCase):
             #             FROM pg_stat_activity
             #             WHERE datname = current_database()
             #             AND pid <> pg_backend_pid()""")
-            cur.execute("""DROP DATABASE IF EXISTS %s""" % self.db_name)
+            cur.execute(f"""DROP DATABASE IF EXISTS {self.db_name}""")
             cur.close()
         conn.close()
 
@@ -79,26 +79,24 @@ class DatabaseCreationTests(unittest.TestCase):
                         FROM information_schema.tables
                         WHERE table_schema='public'
                         AND table_type='BASE TABLE'""")
-            tables_exists = cur.fetchall()
-
-            if tables_exists:
-
+            if tables_exists := cur.fetchall():
                 for table in tables_exists:
                     tables_created.append(table[0])
                     if table[0] not in tables_to_create:
                         extra_table.append(table[0])
 
-                for table in tables_to_create:
-                    if table not in tables_created:
-                        missing_table.append(table)
-
+                missing_table.extend(
+                    table
+                    for table in tables_to_create
+                    if table not in tables_created
+                )
             cur.close()
         conn.close()
 
         if missing_table:
-            print('Missing tables: %s' % missing_table)
+            print(f'Missing tables: {missing_table}')
         if extra_table:
-            print('Extra tables: %s' % extra_table)
+            print(f'Extra tables: {extra_table}')
 
         self.assertEqual(len(tables_to_create), len(tables_created))
         self.assertEqual(len(missing_table), 0)
@@ -114,6 +112,6 @@ class DatabaseCreationTests(unittest.TestCase):
 
         with conn:
             cur = conn.cursor()
-            cur.execute("""DROP DATABASE IF EXISTS %s""" % self.db_name)
+            cur.execute(f"""DROP DATABASE IF EXISTS {self.db_name}""")
             cur.close()
         conn.close()

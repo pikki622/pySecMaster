@@ -64,19 +64,16 @@ def create_database(admin_user='postgres', admin_password='postgres',
 
             cur.execute("""SELECT datname FROM pg_catalog.pg_database
                         WHERE lower(datname)=lower('%s')""" % database)
-            database_exist = cur.fetchone()
+            if database_exist := cur.fetchone():
+                print(f'The {database} database already exists.')
 
-            if not database_exist:
-                cur.execute("""CREATE DATABASE %s OWNER %s""" %
-                            (database, user))
             else:
-                print('The %s database already exists.' % database)
-
+                cur.execute(f"""CREATE DATABASE {database} OWNER {user}""")
             cur.close()
 
     except psycopg2.Error as e:
         conn.rollback()
-        print('Failed to create the %s database' % database)
+        print(f'Failed to create the {database} database')
         print(e)
         return
     except conn.OperationalError:

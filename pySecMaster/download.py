@@ -129,16 +129,15 @@ class QuandlDownload(object):
             return pd.DataFrame()
         except Exception as e:
             print(e)
-            if download_try <= 10:
-                print('Error: An unknown issue occurred when downloading the '
-                      'Quandl codes CSV. Will download the CSV file again.')
-                df = self.download_quandl_codes(db_name, page_num, download_try)
-                return df       # Stop the recursion
-            else:
-                raise OSError('Unknown error when downloading page %s of the '
-                              '%s database. Quitting after 10 failed attempts.'
-                              % (page_num, db_name))
+            if download_try > 10:
+                raise OSError(
+                    f'Unknown error when downloading page {page_num} of the {db_name} database. Quitting after 10 failed attempts.'
+                )
 
+            print('Error: An unknown issue occurred when downloading the '
+                  'Quandl codes CSV. Will download the CSV file again.')
+            df = self.download_quandl_codes(db_name, page_num, download_try)
+            return df       # Stop the recursion
         df['start_date'] = df.apply(date_to_iso, axis=1, args=('start_date',))
         df['end_date'] = df.apply(date_to_iso, axis=1, args=('end_date',))
         df['last_updated'] = df.apply(date_to_iso, axis=1, args=('last_updated',))
@@ -200,14 +199,10 @@ class QuandlDownload(object):
                                                  'low': csv_load_converter,
                                                  'close': csv_load_converter,
                                                  'volume': csv_load_converter})
-            except IndexError:
-                return pd.DataFrame()
-            except OSError:
-                # Occurs when url_obj is None, meaning url returned a 404 error
+            except (IndexError, OSError):
                 return pd.DataFrame()
             except Exception as e:
-                print('Unknown error occurred when reading Quandl CSV for %s' %
-                      q_code)
+                print(f'Unknown error occurred when reading Quandl CSV for {q_code}')
                 print(e)
                 return pd.DataFrame()
 
@@ -225,7 +220,7 @@ class QuandlDownload(object):
                                                   q_code]
                     # Remove any duplicates (keeping the latest) and save to CSV
                     clean_wo_data_df = \
-                        wo_data_df.drop_duplicates(subset='q_code', keep='last')
+                            wo_data_df.drop_duplicates(subset='q_code', keep='last')
                     clean_wo_data_df.to_csv(csv_out, index=False)
                     if verbose:
                         print('%s was removed from the wo_data CSV file since '
@@ -261,7 +256,7 @@ class QuandlDownload(object):
                                            'date_tried', cur_date)
                 # Remove any duplicates (keeping the latest) and save to a CSV
                 clean_wo_data_df = codes_wo_data_df.\
-                    drop_duplicates(subset='q_code', keep='last')
+                        drop_duplicates(subset='q_code', keep='last')
                 clean_wo_data_df.to_csv(csv_out, index=False)
                 if verbose:
                     print('%s still did not have data. Date tried was updated '
@@ -280,7 +275,7 @@ class QuandlDownload(object):
             # Return an empty DF; QuandlDataExtractor will be able to handle it
             return pd.DataFrame()
 
-        if len(raw_df) in [0, 1]:
+        if len(raw_df) in {0, 1}:
             # The raw data has no values
             return pd.DataFrame()
 
@@ -361,21 +356,19 @@ class QuandlDownload(object):
         # Only Quandl Code downloads have page numbers
         if page_num is not None:
             # There is no need for the Quandl Code queries to have dates
-            url_var = str(page_num) + '&auth_token=' + self.quandl_token
+            url_var = f'{str(page_num)}&auth_token=' + self.quandl_token
         else:
             url_var = '?auth_token=' + self.quandl_token
             if beg_date is not None:
                 url_var = url_var + '&trim_start=' + beg_date
 
         try:
-            csv_file = urlopen(db_url + url_var)
-            return csv_file
-
+            return urlopen(db_url + url_var)
         except HTTPError as e:
             if 'http error 400' in str(e).lower():
                 # HTTP Error 400: Bad Request
                 # Don't raise an exception; indicates a non existent code
-                print('HTTPError %s: %s does not exist.' % (e.reason, name))
+                print(f'HTTPError {e.reason}: {name} does not exist.')
             elif 'http error 403' in str(e).lower():
                 # HTTP Error 403: Forbidden
                 raise OSError('HTTPError %s: Reached Quandl API call '
@@ -390,65 +383,51 @@ class QuandlDownload(object):
                 #     # Don't raise an exception; indicates the last page
                 #     print('HTTPError %s: %s not found.' % (e.reason, name))
             elif 'http error 429' in str(e).lower():
-                # HTTP Error 429: Too Many Requests
-                if download_try <= 5:
-                    print('HTTPError %s: Exceeded Quandl API limit. Make '
-                          'the rate_limit more restrictive. Program will '
-                          'sleep for 11 minutes and will try again...'
-                          % (e.reason,))
-                    time.sleep(11 * 60)
-                    self.download_data(name, download_try=download_try)
-                else:
-                    raise OSError('HTTPError %s: Exceeded Quandl API '
-                                  'limit. After trying 5 time, the '
-                                  'download was still not successful. You '
-                                  'could have hit the 50,000 calls per '
-                                  'day limit.' % (e.reason,))
+                if download_try > 5:
+                    raise OSError(
+                        f'HTTPError {e.reason}: Exceeded Quandl API limit. After trying 5 time, the download was still not successful. You could have hit the 50,000 calls per day limit.'
+                    )
+                print(
+                    f'HTTPError {e.reason}: Exceeded Quandl API limit. Make the rate_limit more restrictive. Program will sleep for 11 minutes and will try again...'
+                )
+                time.sleep(11 * 60)
+                self.download_data(name, download_try=download_try)
             elif 'http error 500' in str(e).lower():
                 # HTTP Error 500: Internal Server Error
                 if download_try <= 10:
-                    print('HTTPError %s: Internal Server Error' % (e.reason,))
+                    print(f'HTTPError {e.reason}: Internal Server Error')
             elif 'http error 502' in str(e).lower():
-                # HTTP Error 502: Bad Gateway
-                if download_try <= 10:
-                    print('HTTPError %s: Encountered a bad gateway with '
-                          'the server. Maybe the network is down. Will '
-                          'sleep for 5 minutes' % (e.reason,))
-                    time.sleep(5 * 60)
-                    self.download_data(name, download_try=download_try)
-                else:
-                    raise OSError('HTTPError %s: Server is currently '
-                                  'unavailable. After trying 10 times, the '
-                                  'download was still not successful. '
-                                  'Quitting for now.' % (e.reason,))
+                if download_try > 10:
+                    raise OSError(
+                        f'HTTPError {e.reason}: Server is currently unavailable. After trying 10 times, the download was still not successful. Quitting for now.'
+                    )
+                print(
+                    f'HTTPError {e.reason}: Encountered a bad gateway with the server. Maybe the network is down. Will sleep for 5 minutes'
+                )
+                time.sleep(5 * 60)
+                self.download_data(name, download_try=download_try)
             elif 'http error 503' in str(e).lower():
-                # HTTP Error 503: Service Unavailable
-                if download_try <= 10:
-                    print('HTTPError %s: Server is currently unavailable. '
-                          'Maybe the network is down. Will sleep for 5 '
-                          'minutes' % (e.reason,))
-                    time.sleep(5 * 60)
-                    self.download_data(name, download_try=download_try)
-                else:
-                    raise OSError('HTTPError %s: Server is currently '
-                                  'unavailable. After trying 10 time, the '
-                                  'download was still not successful. '
-                                  'Quitting for now.' % (e.reason,))
+                if download_try > 10:
+                    raise OSError(
+                        f'HTTPError {e.reason}: Server is currently unavailable. After trying 10 time, the download was still not successful. Quitting for now.'
+                    )
+                print(
+                    f'HTTPError {e.reason}: Server is currently unavailable. Maybe the network is down. Will sleep for 5 minutes'
+                )
+                time.sleep(5 * 60)
+                self.download_data(name, download_try=download_try)
             elif 'http error 504' in str(e).lower():
-                # HTTP Error 504: GATEWAY_TIMEOUT
-                if download_try <= 10:
-                    print('HTTPError %s: Server connection timed out. '
-                          'Maybe the network is down. Will sleep for 5 '
-                          'minutes' % (e.reason,))
-                    time.sleep(5 * 60)
-                    self.download_data(name, download_try=download_try)
-                else:
-                    raise OSError('HTTPError %s: Server is currently '
-                                  'unavailable. After trying 10 time, the '
-                                  'download was still not successful. '
-                                  'Quitting for now.' % (e.reason,))
+                if download_try > 10:
+                    raise OSError(
+                        f'HTTPError {e.reason}: Server is currently unavailable. After trying 10 time, the download was still not successful. Quitting for now.'
+                    )
+                print(
+                    f'HTTPError {e.reason}: Server connection timed out. Maybe the network is down. Will sleep for 5 minutes'
+                )
+                time.sleep(5 * 60)
+                self.download_data(name, download_try=download_try)
             else:
-                print('Base URL used: %s' % (db_url + url_var,))
+                print(f'Base URL used: {db_url + url_var}')
                 if page_num:
                     raise OSError('%s - Unknown error when '
                                   'downloading page %i for %s'
@@ -457,18 +436,16 @@ class QuandlDownload(object):
                     raise OSError('%s - Unknown error when '
                                   'downloading %s' % (e, name))
         except URLError as e:
-            if download_try <= 10:
-                print('Warning: Experienced URL Error %s. Program will '
-                      'sleep for 5 minutes and will then try again...' %
-                      (e.reason,))
-                print('URL used: %s' % (db_url + url_var,))
-                time.sleep(5 * 60)
-                self.download_data(name, download_try=download_try)
-            else:
-                raise URLError('Warning: Still experiencing URL Error %s. '
-                               'After trying 10 times, the error remains. '
-                               'Quitting for now, but you can try again '
-                               'later.' % (e.reason,))
+            if download_try > 10:
+                raise URLError(
+                    f'Warning: Still experiencing URL Error {e.reason}. After trying 10 times, the error remains. Quitting for now, but you can try again later.'
+                )
+            print(
+                f'Warning: Experienced URL Error {e.reason}. Program will sleep for 5 minutes and will then try again...'
+            )
+            print(f'URL used: {db_url + url_var}')
+            time.sleep(5 * 60)
+            self.download_data(name, download_try=download_try)
         except Exception as e:
             print(e)
             raise OSError('Warning: Encountered an unknown error when '
@@ -533,7 +510,7 @@ def download_google_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                               'RateLimit more restrictive.' % (e.reason,))
             elif 'http error 404' in str(e).lower():
                 # HTTP Error 404: Not Found
-                raise OSError('HTTPError %s: %s not found' % (e.reason, tsid))
+                raise OSError(f'HTTPError {e.reason}: {tsid} not found')
             elif 'http error 429' in str(e).lower():
                 # HTTP Error 429: Too Many Requests
                 if download_try <= 5:
@@ -550,7 +527,7 @@ def download_google_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
             elif 'http error 500' in str(e).lower():
                 # HTTP Error 500: Internal Server Error
                 if download_try <= 10:
-                    print('HTTPError %s: Internal Server Error' % (e.reason,))
+                    print(f'HTTPError {e.reason}: Internal Server Error')
             elif 'http error 502' in str(e).lower():
                 # HTTP Error 502: Bad Gateway
                 if download_try <= 10:
@@ -594,9 +571,8 @@ def download_google_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                                   'download was still not successful. Quitting '
                                   'for now.' % (e.reason,))
             else:
-                print('Base URL used: %s' % (url,))
-                raise OSError('%s - Unknown error when downloading %s'
-                              % (e, tsid))
+                print(f'Base URL used: {url}')
+                raise OSError(f'{e} - Unknown error when downloading {tsid}')
 
         except URLError as e:
             if download_try <= 10:
@@ -668,8 +644,16 @@ def download_google_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                         #   the prior bar's datetime
                         date_obj = (data[-1][0] +
                                     timedelta(seconds=unix_sec_diff*interval))
-                data.append(tuple((date_obj, float(close), float(high),
-                                   float(low), float(open_), int(volume))))
+                data.append(
+                    (
+                        date_obj,
+                        float(close),
+                        float(high),
+                        float(low),
+                        float(open_),
+                        int(volume),
+                    )
+                )
 
         column_names = ['date', 'close', 'high', 'low', 'open', 'volume']
         processed_df = pd.DataFrame(data, columns=column_names)
@@ -682,8 +666,7 @@ def download_google_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
     except IndexError:
         return pd.DataFrame()
     except Exception as e:
-        print('Unknown error occurred when processing Google raw data for %s' %
-              tsid)
+        print(f'Unknown error occurred when processing Google raw data for {tsid}')
         print(e)
         return pd.DataFrame()
 
@@ -732,14 +715,13 @@ def download_google_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                     print('%s did not have data, thus it was added to the '
                           'wo_data CSV file.' % (tsid,))
         except Exception as e:
-            print('Error occurred when trying to update %s CSV data for %s' %
-                  (csv_out, tsid))
+            print(f'Error occurred when trying to update {csv_out} CSV data for {tsid}')
             print(e)
 
         # Return an empty DF; DataExtraction class will be able to handle it
         return pd.DataFrame()
 
-    if db_url['interval'] == 'i=' + str(60*60*24):
+    if db_url['interval'] == f'i={str(60 * 60 * 24)}':
         # Processing daily data, thus remove the time stamp from the date
         raw_df['date'] = raw_df['date'].apply(lambda x: x.date().isoformat())
     else:
@@ -872,7 +854,7 @@ def download_yahoo_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
             elif 'http error 500' in str(e).lower():
                 # HTTP Error 500: Internal Server Error
                 if download_try <= 10:
-                    print('HTTPError %s: Internal Server Error' % (e.reason,))
+                    print(f'HTTPError {e.reason}: Internal Server Error')
             elif 'http error 502' in str(e).lower():
                 # HTTP Error 502: Bad Gateway
                 if download_try <= 10:
@@ -916,9 +898,8 @@ def download_yahoo_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                                   'download was still not successful. Quitting '
                                   'for now.' % (e.reason,))
             else:
-                print('Base URL used: %s' % (url,))
-                raise OSError('%s - Unknown error when downloading %s' %
-                              (e, tsid))
+                print(f'Base URL used: {url}')
+                raise OSError(f'{e} - Unknown error when downloading {tsid}')
 
         except URLError as e:
             if download_try <= 10:
@@ -951,13 +932,10 @@ def download_yahoo_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                                          'low': csv_load_converter,
                                          'close': csv_load_converter,
                                          'volume': csv_load_converter})
-    except IndexError:
-        return pd.DataFrame()
-    except OSError:
-        # Occurs when the url_obj is None, meaning the url returned a 404 error
+    except (IndexError, OSError):
         return pd.DataFrame()
     except Exception as e:
-        print('Unknown error occurred when reading Yahoo CSV for %s' % tsid)
+        print(f'Unknown error occurred when reading Yahoo CSV for {tsid}')
         print(e)
         return pd.DataFrame()
 
@@ -1006,8 +984,7 @@ def download_yahoo_data(db_url, tsid, exchanges_df, csv_out, verbose=True):
                     print('%s did not have data, thus it was added to the '
                           'wo_data CSV file.' % (tsid,))
         except Exception as e:
-            print('Error occurred when trying to update %s CSV data for %s' %
-                  (csv_out, tsid))
+            print(f'Error occurred when trying to update {csv_out} CSV data for {tsid}')
             print(e)
 
         # Return an empty DF; DataExtraction class will be able to handle it
@@ -1109,8 +1086,7 @@ def download_csidata_factsheet(db_url, data_type, exchange_id=None,
                               'RateLimit more restrictive.' % (e.reason,))
             elif 'http error 404' in str(e).lower():
                 # HTTP Error 404: Not Found
-                raise OSError('HTTPError %s: %s not found' %
-                              (e.reason, data_type))
+                raise OSError(f'HTTPError {e.reason}: {data_type} not found')
             elif 'http error 429' in str(e).lower():
                 # HTTP Error 429: Too Many Requests
                 if download_try <= 5:
@@ -1127,7 +1103,7 @@ def download_csidata_factsheet(db_url, data_type, exchange_id=None,
             elif 'http error 500' in str(e).lower():
                 # HTTP Error 500: Internal Server Error
                 if download_try <= 10:
-                    print('HTTPError %s: Internal Server Error' % (e.reason,))
+                    print(f'HTTPError {e.reason}: Internal Server Error')
             elif 'http error 502' in str(e).lower():
                 # HTTP Error 502: Bad Gateway
                 if download_try <= 10:
@@ -1171,9 +1147,8 @@ def download_csidata_factsheet(db_url, data_type, exchange_id=None,
                                   'download was still not successful. Quitting '
                                   'for now.' % (e.reason,))
             else:
-                print('Base URL used: %s' % (url,))
-                raise OSError('%s - Unknown error when downloading %s'
-                              % (e, data_type))
+                print(f'Base URL used: {url}')
+                raise OSError(f'{e} - Unknown error when downloading {data_type}')
 
         except URLError as e:
             if download_try <= 10:
@@ -1280,7 +1255,7 @@ def download_nasdaq_industry_sector(db_url, exchange_list):
                               'RateLimit more restrictive.' % (e.reason,))
             elif 'http error 404' in str(e).lower():
                 # HTTP Error 404: Not Found
-                raise OSError('HTTPError %s: Not found' % (e.reason,))
+                raise OSError(f'HTTPError {e.reason}: Not found')
             elif 'http error 429' in str(e).lower():
                 # HTTP Error 429: Too Many Requests
                 if download_try <= 5:
@@ -1297,7 +1272,7 @@ def download_nasdaq_industry_sector(db_url, exchange_list):
             elif 'http error 500' in str(e).lower():
                 # HTTP Error 500: Internal Server Error
                 if download_try <= 10:
-                    print('HTTPError %s: Internal Server Error' % (e.reason,))
+                    print(f'HTTPError {e.reason}: Internal Server Error')
             elif 'http error 502' in str(e).lower():
                 # HTTP Error 502: Bad Gateway
                 if download_try <= 10:
@@ -1341,8 +1316,8 @@ def download_nasdaq_industry_sector(db_url, exchange_list):
                                   'download was still not successful. Quitting '
                                   'for now.' % (e.reason,))
             else:
-                print('Base URL used: %s' % url)
-                raise OSError('%s - Unknown error when downloading data' % e)
+                print(f'Base URL used: {url}')
+                raise OSError(f'{e} - Unknown error when downloading data')
 
         except URLError as e:
             if download_try <= 10:

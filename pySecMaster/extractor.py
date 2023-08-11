@@ -74,8 +74,9 @@ class QuandlCodeExtract(object):
 
         # The quandl_codes table is empty, so all codes should be downloaded
         if len(data_sets) == 0:
-            print('Downloading all Quandl Codes for the following databases: %s'
-                  % (", ".join([db for db in self.db_list])))
+            print(
+                f'Downloading all Quandl Codes for the following databases: {", ".join(list(self.db_list))}'
+            )
 
             for db_name in self.db_list:
                 self.extractor(db_name)
@@ -84,21 +85,18 @@ class QuandlCodeExtract(object):
                   'taking %0.1f seconds' %
                   (len(self.db_list), time.time() - extractor_start))
 
-        # Codes already exists in the quandl_codes table; this will determine
-        #   if the codes need to be updated or if the download was incomplete.
         else:
 
             # This for loop only provides program info; doesn't format anything
             for row in range(len(data_sets)):
-                existing_vendor = data_sets.loc[row, 'data_vendor']
                 # existing_page_num = data_sets.loc[row, 'page_num']
                 existing_updated_date = data_sets.loc[row, 'updated_date']
+                existing_vendor = data_sets.loc[row, 'data_vendor']
                 if (existing_vendor[existing_vendor.find('_')+1] not in
                         self.db_list):
-                    print('FLAG: Did not update the %s data set because it was '
-                          'not included in the database_list variable. The '
-                          'last update was on %s' %
-                          (existing_vendor, existing_updated_date))
+                    print(
+                        f'FLAG: Did not update the {existing_vendor} data set because it was not included in the database_list variable. The last update was on {existing_updated_date}'
+                    )
 
             for data_vendor in self.db_list:
 
@@ -108,7 +106,6 @@ class QuandlCodeExtract(object):
                 if len(vendor_exist) == 0:
                     self.extractor(data_vendor)
 
-                # Data vendor already exist. Check for other criteria
                 else:
                     page_num = data_sets.loc[data_sets['data_vendor'] ==
                                              data_vendor, 'page_num']
@@ -130,9 +127,6 @@ class QuandlCodeExtract(object):
                               'page %i' % (data_vendor, page_num + 1))
                         self.extractor(data_vendor, page_num + 1)
 
-                    # Quandl Codes have been updated in more days than update
-                    #   range, thus the entire data set's codes should be
-                    #   refreshed.
                     elif updated_date < beg_date_obj:
                         print('The Quandl Codes for %s were downloaded more '
                               'than %i days ago, the maximum update range. '
@@ -150,8 +144,7 @@ class QuandlCodeExtract(object):
                         elif del_success == 'failure':
                             continue
                     else:
-                        print('All of the Quandl Codes for %s are up to date.'
-                              % (data_vendor,))
+                        print(f'All of the Quandl Codes for {data_vendor} are up to date.')
 
     def query_last_download_pg(self):
         """ Find Quandl data sets that did not finished downloading all of their
@@ -162,9 +155,9 @@ class QuandlCodeExtract(object):
         :return: A DataFrame with the Quandl data set and the max page_num.
         """
 
-        engine = create_engine('postgresql://%s:%s@%s:%s/%s' %
-                               (self.user, self.password, self.host, self.port,
-                                self.database))
+        engine = create_engine(
+            f'postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}'
+        )
         conn = engine.connect()
         df = pd.DataFrame()
 
@@ -325,10 +318,7 @@ class QuandlCodeExtract(object):
                     return q_code[q_code.find('/') + 1:]
             elif column == 'period':
                 # If block handles 1 item codes that are in 3 item data sets
-                if q_code.find('_') != -1:
-                    return q_code[q_code.rfind('_') + 1:]
-                else:
-                    return 'Unknown'
+                return q_code[q_code.rfind('_') + 1:] if q_code.find('_') != -1 else 'Unknown'
             else:
                 print('Error: Unknown column [%s] passed in to strip_q_code in '
                       'process_3_item_q_codes' % (column,))
@@ -425,11 +415,10 @@ class QuandlDataExtraction(object):
         self.days_back = days_back
         self.threads = threads
         self.table = table
-        self.verbose = verbose
-
         # Rate limiter parameters based on Quandl API limitations
         rate = 2000
         period_sec = 600
+        self.verbose = verbose
         self.min_interval = float((period_sec/rate)*threads)
 
         self.csv_wo_data = load_tables + '/quandl_' + self.table+'_wo_data.csv'
@@ -449,9 +438,9 @@ class QuandlDataExtraction(object):
                 database=self.database, user=self.user, password=self.password,
                 host=self.host, port=self.port, name='Quandl_GOOG')
         else:
-            raise NotImplementedError('The %s Quandl source is not implemented '
-                                      'in the init within QuandlDataExtraction'
-                                      % self.download_selection)
+            raise NotImplementedError(
+                f'The {self.download_selection} Quandl source is not implemented in the init within QuandlDataExtraction'
+            )
 
         print('Retrieving dates of the last price per ticker for all Quandl '
               'values.')
@@ -601,7 +590,6 @@ class QuandlDataExtraction(object):
                 print('Updated %s | %0.1f seconds' %
                       (q_code, time.time() - main_time_start))
 
-        # The pricing database has prior values; append/replace new data points
         else:
             try:
                 last_date = self.latest_prices.loc[tsid, 'date']
@@ -624,8 +612,7 @@ class QuandlDataExtraction(object):
                     clean_data = raw_data[raw_data.date > last_date]
 
             except Exception as e:
-                print('Failed to determine what data is new for %s in extractor'
-                      % q_code)
+                print(f'Failed to determine what data is new for {q_code} in extractor')
                 print(e)
                 return
 
@@ -727,11 +714,7 @@ class GoogleFinanceDataExtraction(object):
         self.table = table
         self.verbose = verbose
 
-        # Rate limiter parameters based on guessed Google Finance limitations
-        # Received captcha if too fast (about 2000 queries within x seconds)
-        rate = 60       # Received captcha at 70/60s
-        period_sec = 60
-        self.min_interval = float((period_sec/rate)*threads)
+        self.min_interval = float(1 * threads)
 
         self.vendor_id = query_data_vendor_id(
             database=self.database, user=self.user, password=self.password,
@@ -909,7 +892,6 @@ class GoogleFinanceDataExtraction(object):
                     print('Updated %s | %0.1f seconds' %
                           (tsid, time.time() - main_time_start))
 
-        # The pricing database has prior values; append/replace new data points
         else:
             try:
                 last_date = self.latest_prices.loc[tsid, 'date']
@@ -926,8 +908,7 @@ class GoogleFinanceDataExtraction(object):
                 else:
                     clean_data = raw_data[raw_data.date > last_date]
             except Exception as e:
-                print('Failed to determine what data is new for %s in extractor'
-                      % tsid)
+                print(f'Failed to determine what data is new for {tsid} in extractor')
                 print(e)
                 return
 
@@ -936,7 +917,6 @@ class GoogleFinanceDataExtraction(object):
                 if self.verbose:
                     print('No update for %s | %0.1f seconds' %
                           (tsid, time.time() - main_time_start))
-            # There is new data to add to the database
             else:
                 clean_data.insert(0, 'data_vendor_id', self.vendor_id)
                 clean_data.insert(1, 'source', 'tsid')
@@ -955,8 +935,8 @@ class GoogleFinanceDataExtraction(object):
                                 AND data_vendor_id='%s'""" %
                              (self.table, tsid, first_date_iso, self.vendor_id))
 
-                    del_success = 'failure'
                     retry_count = 5
+                    del_success = 'failure'
                     while retry_count > 0:
                         del_success = delete_sql_table_rows(
                             database=self.database, user=self.user,
@@ -973,9 +953,9 @@ class GoogleFinanceDataExtraction(object):
                     # If unable to delete existing data, skip ticker
                     if del_success == 'failure':
                         if self.verbose:
-                            print('Unable to delete existing data for %s '
-                                  'in the GoogleFinanceDataExtraction. '
-                                  'Skipping it for now.' % tsid)
+                            print(
+                                f'Unable to delete existing data for {tsid} in the GoogleFinanceDataExtraction. Skipping it for now.'
+                            )
                         return
 
                 # Append the new data to the end, regardless of replacement
@@ -1215,7 +1195,6 @@ class YahooFinanceDataExtraction(object):
                     print('Updated %s | %0.1f seconds' %
                           (tsid, time.time() - main_time_start))
 
-        # The pricing database has prior values; append/replace new data points
         else:
             try:
                 last_date = self.latest_prices.loc[tsid, 'date']
@@ -1232,8 +1211,7 @@ class YahooFinanceDataExtraction(object):
                 else:
                     clean_data = raw_data[raw_data.date > last_date]
             except Exception as e:
-                print('Failed to determine what data is new for %s in extractor'
-                      % tsid)
+                print(f'Failed to determine what data is new for {tsid} in extractor')
                 print(e)
                 return
 
@@ -1242,7 +1220,6 @@ class YahooFinanceDataExtraction(object):
                 if self.verbose:
                     print('No update for %s | %0.1f seconds' %
                           (tsid, time.time() - main_time_start))
-            # There is new data to add to the database
             else:
                 clean_data.insert(0, 'data_vendor_id', self.vendor_id)
                 clean_data.insert(1, 'source', 'tsid')
@@ -1261,8 +1238,8 @@ class YahooFinanceDataExtraction(object):
                                 AND data_vendor_id='%s'""" %
                              (self.table, tsid, first_date_iso, self.vendor_id))
 
-                    del_success = 'failure'
                     retry_count = 5
+                    del_success = 'failure'
                     while retry_count > 0:
                         del_success = delete_sql_table_rows(
                             database=self.database, user=self.user,
@@ -1279,9 +1256,9 @@ class YahooFinanceDataExtraction(object):
                     # If unable to delete existing data, skip ticker
                     if del_success == 'failure':
                         if self.verbose:
-                            print('Unable to delete existing data for %s '
-                                  'in the YahooFinanceDataExtraction. Skipping '
-                                  'it for now.' % tsid)
+                            print(
+                                f'Unable to delete existing data for {tsid} in the YahooFinanceDataExtraction. Skipping it for now.'
+                            )
                         return
 
                 # Append the new data to the end, regardless of replacement
@@ -1332,8 +1309,7 @@ class CSIDataExtractor(object):
         if len(existing_data.index) == 0:
             # The csidata_stock_factsheet table is empty; download new data
 
-            print('Downloading the CSI Data factsheet for %s' %
-                  (self.data_type,))
+            print(f'Downloading the CSI Data factsheet for {self.data_type}')
             data = download_csidata_factsheet(self.db_url, self.data_type,
                                               self.exchange_id)
 
@@ -1353,8 +1329,7 @@ class CSIDataExtractor(object):
             if existing_data.loc[0, 'updated_date'] < beg_date_obj:
 
                 # Download the latest data
-                print('Downloading the CSI Data factsheet for %s' %
-                      (self.data_type,))
+                print(f'Downloading the CSI Data factsheet for {self.data_type}')
                 data = download_csidata_factsheet(self.db_url, self.data_type,
                                                   self.exchange_id)
 
@@ -1364,8 +1339,8 @@ class CSIDataExtractor(object):
                     return
 
                 else:
-                    data_col = list(data.columns.values)
                     existing_data_col = list(existing_data.columns.values)
+                    data_col = list(data.columns.values)
                     if ((len(data) >= 1.2 * len(existing_data)) |
                             (len(data) <= len(existing_data) / 1.2) |
                             (data_col == existing_data_col)):
@@ -1378,18 +1353,18 @@ class CSIDataExtractor(object):
                         return
 
                     # Delete old data [since not referenced in a foreign key]
-                    query = ('DELETE FROM %s' % (table,))
+                    query = f'DELETE FROM {table}'
                     del_success = delete_sql_table_rows(
                         database=self.database, user=self.user,
                         password=self.password, host=self.host, port=self.port,
                         query=query, table=table, item=self.data_type)
 
                     if del_success == 'success':
-                        print('The data in the %s table was successfully '
-                              'deleted. Will now repopulate it...' % (table,))
+                        print(
+                            f'The data in the {table} table was successfully deleted. Will now repopulate it...'
+                        )
                     elif del_success == 'failure':
-                        print('There was an error deleting the data from %s' %
-                              (table,))
+                        print(f'There was an error deleting the data from {table}')
                         return
 
             else:
@@ -1491,8 +1466,7 @@ class NASDAQSectorIndustryExtractor(object):
                                                      self.exchange_list)
 
             if len(raw_df.index) == 0:
-                print('No data returned for these exchange: %s' %
-                      self.exchange_list)
+                print(f'No data returned for these exchange: {self.exchange_list}')
                 return
 
         else:
@@ -1513,8 +1487,7 @@ class NASDAQSectorIndustryExtractor(object):
                                                          self.exchange_list)
 
                 if len(raw_df.index) == 0:
-                    print('No data returned for these exchanges: %s' %
-                          self.exchange_list)
+                    print(f'No data returned for these exchanges: {self.exchange_list}')
                     return
 
             else:
@@ -1642,8 +1615,4 @@ class NASDAQSectorIndustryExtractor(object):
                                left_on=['tsid', 'sector', 'industry'],
                                right_on=['source_id', 'sector', 'industry'])
 
-        # In a new DataFrame, only keep the new_df rows that did NOT have a
-        #   match to the existing_df
-        altered_df = new_df[~new_df['source_id'].isin(combined_df['source_id'])]
-
-        return altered_df
+        return new_df[~new_df['source_id'].isin(combined_df['source_id'])]

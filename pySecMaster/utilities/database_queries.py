@@ -51,7 +51,7 @@ def delete_sql_table_rows(database, user, password, host, port, query, table,
     """
 
     if verbose:
-        print('Deleting all rows in %s that fit the provided criteria' % table)
+        print(f'Deleting all rows in {table} that fit the provided criteria')
 
     conn = psycopg2.connect(database=database, user=user, password=password,
                             host=host, port=port)
@@ -104,11 +104,11 @@ def df_to_sql(database, user, password, host, port, df, sql_table, exists,
     """
 
     if verbose:
-        print('Entering the data for %s into the %s database.' %
-              (item, database))
+        print(f'Entering the data for {item} into the {database} database.')
 
-    engine = create_engine('postgresql://%s:%s@%s:%s/%s' %
-                           (user, password, host, port, database))
+    engine = create_engine(
+        f'postgresql://{user}:{password}@{host}:{port}/{database}'
+    )
     conn = engine.connect()
 
     # Try and except block writes the new data to the SQL Database.
@@ -116,8 +116,7 @@ def df_to_sql(database, user, password, host, port, df, sql_table, exists,
         # if_exists options: append new df rows, replace all table values
         df.to_sql(sql_table, conn, if_exists=exists, index=False)
         if verbose:
-            print('Successfully entered the values into the %s database' %
-                  database)
+            print(f'Successfully entered the values into the {database} database')
     except Exception as e:
         print('Error: Unknown issue when adding the DataFrame to the %s '
               'database for %s' % (database, item))
@@ -156,7 +155,7 @@ def query_all_active_tsids(database, user, password, host, port, table,
             cur = conn.cursor()
 
             if period:
-                beg_date = datetime.today() - timedelta(days=period)
+                beg_date = datetime.now() - timedelta(days=period)
                 # query = ("""SELECT DISTINCT ON (source_id)
                 #                 source_id as tsid
                 #          FROM %s
@@ -198,8 +197,7 @@ def query_all_active_tsids(database, user, password, host, port, table,
                          (table,))
 
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['tsid'])
                 df.drop_duplicates(inplace=True)
             else:
@@ -257,39 +255,38 @@ def query_all_tsid_prices(database, user, password, host, port, table, tsid):
                 columns = ['data_vendor_id', 'date', 'open', 'high', 'low',
                            'close', 'volume']
             else:
-                raise NotImplementedError('Table %s is not implemented '
-                                          'within query_all_tsid_prices in'
-                                          'database_queries.py' % table)
+                raise NotImplementedError(
+                    f'Table {table} is not implemented within query_all_tsid_prices indatabase_queries.py'
+                )
 
-            data = cur.fetchall()
-            if data:
-                df = pd.DataFrame(data, columns=columns)
+            if not (data := cur.fetchall()):
+                raise TypeError(
+                    f'Not able to query any prices for {tsid} in query_all_tsid_prices'
+                )
+            df = pd.DataFrame(data, columns=columns)
 
                 # Convert the ISO date to a datetime object
-                if table == 'daily_prices':
-                    df['date'] = pd.to_datetime(df['date'], utc=True)
-                    df['date'] = df['date'].apply(lambda x: x.date())
-                elif table == 'minute_prices':
-                    df['date'] = pd.to_datetime(df['date'], utc=True)
-                else:
-                    raise NotImplementedError('Table %s is not implemented '
-                                              'within query_all_tsid_prices in'
-                                              'database_queries.py' % table)
-
-                # Drop duplicate rows based on only the tsid and date columns
-                df.drop_duplicates(subset=['data_vendor_id', 'date'],
-                                   inplace=True)
-
-                # Move and set the date and data_vendor_id columns to the index
-                df.set_index(['date', 'data_vendor_id'], inplace=True)
-
-                # Have to rename the indices as set_index removes the names
-                df.index.name = ['date', 'data_vendor_id']
-
-                df.sort_index(inplace=True)
+            if table == 'daily_prices':
+                df['date'] = pd.to_datetime(df['date'], utc=True)
+                df['date'] = df['date'].apply(lambda x: x.date())
+            elif table == 'minute_prices':
+                df['date'] = pd.to_datetime(df['date'], utc=True)
             else:
-                raise TypeError('Not able to query any prices for %s in '
-                                'query_all_tsid_prices' % tsid)
+                raise NotImplementedError(
+                    f'Table {table} is not implemented within query_all_tsid_prices indatabase_queries.py'
+                )
+
+            # Drop duplicate rows based on only the tsid and date columns
+            df.drop_duplicates(subset=['data_vendor_id', 'date'],
+                               inplace=True)
+
+            # Move and set the date and data_vendor_id columns to the index
+            df.set_index(['date', 'data_vendor_id'], inplace=True)
+
+            # Have to rename the indices as set_index removes the names
+            df.index.name = ['date', 'data_vendor_id']
+
+            df.sort_index(inplace=True)
     except psycopg2.Error as e:
         print(e)
         raise TypeError('Error when trying to connect to the %s database '
@@ -415,12 +412,9 @@ def query_codes(database, user, password, host, port, download_selection):
                                 'selections include all, us_main,'
                                 'us_main_no_end_date and us_canada_london.')
 
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['tsid'])
                 df.drop_duplicates(inplace=True)
-
-                # df.to_csv('query_tsid.csv')
 
             else:
                 raise TypeError('Not able to determine the tsid from '
@@ -499,15 +493,14 @@ def query_csi_stocks(database, user, password, host, port, query='all'):
                                    AS csi
                                ORDER BY symbol, exchange, is_active DESC
                                    NULLS LAST""")
-                rows = cur.fetchall()
-                if rows:
+                if rows := cur.fetchall():
                     csi_df = pd.DataFrame(rows, columns=['sid', 'ticker',
                                                          'exchange',
                                                          'sub_exchange'])
                 else:
-                    raise SystemExit('Not able to retrieve any tickers after '
-                                     'querying %s in query_csi_stocks'
-                                     % (query,))
+                    raise SystemExit(
+                        f'Not able to retrieve any tickers after querying {query} in query_csi_stocks'
+                    )
 
             elif query == 'main_us':
                 # Restricts tickers to those that have been active within the
@@ -536,15 +529,14 @@ def query_csi_stocks(database, user, password, host, port, query='all'):
                                ORDER BY symbol, exchange, is_active DESC
                                    NULLS LAST""",
                             (beg_date.isoformat(),))
-                rows = cur.fetchall()
-                if rows:
+                if rows := cur.fetchall():
                     csi_df = pd.DataFrame(rows, columns=['sid', 'ticker',
                                                          'exchange',
                                                          'sub_exchange'])
                 else:
-                    raise SystemExit('Not able to retrieve any tickers after '
-                                     'querying %s in query_csi_stocks'
-                                     % (query,))
+                    raise SystemExit(
+                        f'Not able to retrieve any tickers after querying {query} in query_csi_stocks'
+                    )
             else:
                 raise SystemExit('%s query does not exist within '
                                  'query_csi_stocks. Valid queries '
@@ -594,8 +586,7 @@ def query_csi_stock_start_date(database, user, password, host, port, tsid):
                             WHERE csi.source='csi_data'
                             AND tsid.source='tsid'
                             AND tsid.source_id=(%s))""", (tsid,))
-            row = cur.fetchone()
-            if row:
+            if row := cur.fetchone():
                 start_date_obj = row[0]
                 start_date = start_date_obj.strftime('%Y-%m-%d')
             else:
@@ -656,8 +647,7 @@ def query_data_vendor_id(database, user, password, host, port, name):
                     data = df['data_vendor_id'].values.tolist()
             else:
                 data = 'Unknown'
-                print('Not able to determine the data_vendor_id for %s'
-                      % name)
+                print(f'Not able to determine the data_vendor_id for {name}')
     except psycopg2.Error as e:
         print('Error when trying to retrieve data from the %s database in '
               'query_data_vendor_id' % database)
@@ -776,7 +766,7 @@ def query_last_price(database, user, password, host, port, table, vendor_id):
     """
 
     if type(vendor_id) == list:
-        vendor_id = ', '.join(["'" + str(vendor) + "'" for vendor in vendor_id])
+        vendor_id = ', '.join([f"'{str(vendor)}'" for vendor in vendor_id])
     elif type(vendor_id) == int:
         vendor_id = str(vendor_id)
     else:
@@ -1059,13 +1049,8 @@ def query_q_codes(database, user, password, host, port, download_selection):
                                   'goog_us_main, goog_us_main_no_end_date,'
                                   'goog_us_canada_london, and goog_etf.')
 
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['tsid', 'q_code'])
-                # df.drop_duplicates(inplace=True)
-
-                # ticker_list = df.values.flatten()
-                # df.to_csv('query_q_code.csv')
             else:
                 raise SystemError('Not able to determine the q_codes '
                                   'from the SQL query in query_q_codes')
@@ -1106,8 +1091,7 @@ def query_source_weights(database, user, password, host, port):
             query = ("""SELECT data_vendor_id, consensus_weight
                         FROM data_vendor""")
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['data_vendor_id',
                                                  'consensus_weight'])
                 df.drop_duplicates(inplace=True)
@@ -1214,8 +1198,7 @@ def update_load_table(database, user, password, host, port, values_df, table,
                                  row['api'], row['consensus_weight'],
                                  row['updated_date'], row['data_vendor_id']))
                     if verbose:
-                        print('Updated data vendor id %s' %
-                              row['data_vendor_id'])
+                        print(f"Updated data vendor id {row['data_vendor_id']}")
 
             elif table == 'exchanges':
                 for index, row in values_df.iterrows():
@@ -1235,7 +1218,7 @@ def update_load_table(database, user, password, host, port, values_df, table,
                                  row['open'], row['close'], row['lunch'],
                                  row['updated_date'], row['exchange_id']))
                     if verbose:
-                        print('Updated exchange id %s' % row['exchange_id'])
+                        print(f"Updated exchange id {row['exchange_id']}")
 
             else:
                 raise NotImplementedError('%s is not implemented within '
@@ -1315,8 +1298,9 @@ def update_classification_values(database, user, password, host, port,
                                 (row['level_4'], row['updated_date'],
                                  row['source_id'], row['standard']))
                 if verbose:
-                    print('Updated classification %s values for %s' %
-                          (row['standard'], row['source_id']))
+                    print(
+                        f"Updated classification {row['standard']} values for {row['source_id']}"
+                    )
             conn.commit()
     except psycopg2.Error as e:
         conn.rollback()
@@ -1363,8 +1347,9 @@ def update_symbology_values(database, user, password, host, port, values_df,
                             (row['source_id'], row['updated_date'],
                              row['symbol_id'], row['source']))
                 if verbose:
-                    print('Updated symbology source id %s to be %s' %
-                          (row['symbol_id'], row['source_id']))
+                    print(
+                        f"Updated symbology source id {row['symbol_id']} to be {row['source_id']}"
+                    )
             conn.commit()
     except psycopg2.Error as e:
         conn.rollback()

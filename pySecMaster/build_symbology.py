@@ -57,11 +57,7 @@ def altered_values(existing_df, new_df):
                            left_on=['symbol_id', 'source_id'],
                            right_on=['sid', 'ticker'])
 
-    # In a new DataFrame, only keep the new_df rows that did NOT have a match
-    #   to the existing_df
-    altered_df = new_df[~new_df['sid'].isin(combined_df['sid'])]
-
-    return altered_df
+    return new_df[~new_df['sid'].isin(combined_df['sid'])]
 
 
 def create_symbology(database, user, password, host, port, source_list):
@@ -210,21 +206,18 @@ def create_symbology(database, user, password, host, port, source_list):
                                          sub_exchange, 'goog_symbol'].values)
                             if goog_exch:
                                 return 'GOOG/' + goog_exch[0] + '_' + ticker
+                            # (exch: NYSE | chld_exch: OTC Markets QX)
+                            # (exch: AMEX | chld_exch: BATS Global Markets)
+                            goog_exch = (exch_df.loc[exch_df['name'] ==
+                                         sub_exchange, 'goog_symbol'].
+                                         values)
+                            if goog_exch:
+                                return 'GOOG/' + goog_exch[0] + '_' + ticker
                             else:
-                                # (exch: NYSE | chld_exch: OTC Markets QX)
-                                # (exch: AMEX | chld_exch: BATS Global Markets)
-                                goog_exch = (exch_df.loc[exch_df['name'] ==
-                                             sub_exchange, 'goog_symbol'].
-                                             values)
-                                if goog_exch:
-                                    return 'GOOG/' + goog_exch[0] + '_' + ticker
-                                else:
-                                    print('Unable to find the goog exchange '
-                                          'symbol for the sub exchange %s in '
-                                          'csi_to_quandl_goog. Will try to '
-                                          'find a match for the exchange now.'
-                                          % sub_exchange)
-                                    # If there is an exchange, try to match that
+                                print(
+                                    f'Unable to find the goog exchange symbol for the sub exchange {sub_exchange} in csi_to_quandl_goog. Will try to find a match for the exchange now.'
+                                )
+                                                                # If there is an exchange, try to match that
 
                         if exchange:
                             # Either no sub exchange or the sub exchange
@@ -307,21 +300,18 @@ def create_symbology(database, user, password, host, port, source_list):
                                          sub_exchange, 'tsid_symbol'].values)
                             if tsid_exch:
                                 return ticker + '.' + tsid_exch[0] + '.0'
+                            # (exch: NYSE | chld_exch: OTC Markets QX)
+                            # (exch: AMEX | chld_exch: BATS Global Markets)
+                            tsid_exch = (exch_df.loc[exch_df['name'] ==
+                                         sub_exchange, 'tsid_symbol'].
+                                         values)
+                            if tsid_exch:
+                                return ticker + '.' + tsid_exch[0] + '.0'
                             else:
-                                # (exch: NYSE | chld_exch: OTC Markets QX)
-                                # (exch: AMEX | chld_exch: BATS Global Markets)
-                                tsid_exch = (exch_df.loc[exch_df['name'] ==
-                                             sub_exchange, 'tsid_symbol'].
-                                             values)
-                                if tsid_exch:
-                                    return ticker + '.' + tsid_exch[0] + '.0'
-                                else:
-                                    print('Unable to find the tsid exchange '
-                                          'symbol for the sub exchange %s in '
-                                          'csi_to_tsid. Will try to '
-                                          'find a match for the exchange now.'
-                                          % sub_exchange)
-                                    # If there is an exchange, try to match that
+                                print(
+                                    f'Unable to find the tsid exchange symbol for the sub exchange {sub_exchange} in csi_to_tsid. Will try to find a match for the exchange now.'
+                                )
+                                                                # If there is an exchange, try to match that
                         if exchange:
                             # Either no sub exchange or the sub exchange
                             #   never found a match

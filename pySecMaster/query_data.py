@@ -56,7 +56,7 @@ def pull_daily_prices(database, user, password, host, port, query_type,
             cur = conn.cursor()
             if query_type == 'ticker':
                 tsid, = args
-                print('Extracting the daily prices for %s' % (tsid,))
+                print(f'Extracting the daily prices for {tsid}')
 
                 cur.execute("""SELECT date, source_id AS tsid, open, high, low,
                                 close, volume
@@ -68,8 +68,7 @@ def pull_daily_prices(database, user, password, host, port, query_type,
 
             elif query_type == 'index':
                 index, as_of_date = args
-                print('Extracting the daily prices for tickers in the %s' %
-                      (index,))
+                print(f'Extracting the daily prices for tickers in the {index}')
 
                 cur.execute("""SELECT date, source_id AS tsid, open, high, low,
                                 close, volume
@@ -86,12 +85,11 @@ def pull_daily_prices(database, user, password, host, port, query_type,
                              beg_date, end_date))
 
             else:
-                raise NotImplementedError('Query type %s is not implemented '
-                                          'within pull_daily_prices' %
-                                          query_type)
+                raise NotImplementedError(
+                    f'Query type {query_type} is not implemented within pull_daily_prices'
+                )
 
-            rows = cur.fetchall()
-            if rows:
+            if rows := cur.fetchall():
                 df = pd.DataFrame(rows,
                                   columns=['date', 'tsid', 'open', 'high',
                                            'low', 'close', 'volume'])
@@ -148,7 +146,7 @@ def pull_minute_prices(database, user, password, host, port, query_type,
             cur = conn.cursor()
             if query_type == 'ticker':
                 tsid, = args
-                print('Extracting the minute prices for %s' % (tsid,))
+                print(f'Extracting the minute prices for {tsid}')
 
                 cur.execute("""SELECT date, source_id AS tsid, open, high, low,
                                 close, volume
@@ -158,12 +156,11 @@ def pull_minute_prices(database, user, password, host, port, query_type,
                             AND date>=%s AND date<=%s""",
                             (tsid, source, data_vendor_id, beg_date, end_date))
             else:
-                raise NotImplementedError('Query type %s is not implemented '
-                                          'within pull_minute_prices' %
-                                          query_type)
+                raise NotImplementedError(
+                    f'Query type {query_type} is not implemented within pull_minute_prices'
+                )
 
-            rows = cur.fetchall()
-            if rows:
+            if rows := cur.fetchall():
                 df = pd.DataFrame(rows,
                                   columns=['date', 'tsid', 'open', 'high',
                                            'low', 'close', 'volume'])
@@ -204,7 +201,6 @@ if __name__ == '__main__':
     test_host = userdir['postgresql']['pysecmaster_host']
     test_port = userdir['postgresql']['pysecmaster_port']
 
-    test_query_type = 'ticker'     # index, ticker
     test_tsid = 'AAPL.Q.0'
     test_data_vendor_id = 15        # pySecMaster_Consensus
     # test_data_vendor_id = 12        # Google_Finance
@@ -217,7 +213,15 @@ if __name__ == '__main__':
     test_as_of_date = '2015-01-01'
 
     start_time = time.time()
-    if test_query_type == 'ticker':
+    test_query_type = 'ticker'
+    if test_query_type == 'index':
+        prices_df = pull_daily_prices(test_database, test_user,
+                                      test_password, test_host, test_port,
+                                      test_query_type, test_beg_date,
+                                      test_end_date, test_index,
+                                      test_as_of_date)
+
+    elif test_query_type == 'ticker':
         if frequency == 'daily':
             prices_df = pull_daily_prices(test_database, test_user,
                                           test_password, test_host, test_port,
@@ -233,19 +237,14 @@ if __name__ == '__main__':
                                            'tsid', test_tsid)
 
         else:
-            raise NotImplementedError('Frequency %s is not implemented within '
-                                      'query_data.py' % frequency)
-
-    elif test_query_type == 'index':
-        prices_df = pull_daily_prices(test_database, test_user,
-                                      test_password, test_host, test_port,
-                                      test_query_type, test_beg_date,
-                                      test_end_date, test_index,
-                                      test_as_of_date)
+            raise NotImplementedError(
+                f'Frequency {frequency} is not implemented within query_data.py'
+            )
 
     else:
-        raise NotImplementedError('Query type %s is not implemented within '
-                                  'query_data.py' % test_query_type)
+        raise NotImplementedError(
+            f'Query type {test_query_type} is not implemented within query_data.py'
+        )
 
     csv_friendly_tsid = re.sub('[.]', '_', test_tsid)
     print('Query took %0.2f seconds' % (time.time() - start_time))
@@ -257,4 +256,4 @@ if __name__ == '__main__':
     unique_codes = pd.unique((prices_df['tsid']).values)
     print('There are %i unique tsid codes' % (len(unique_codes)))
     print('There are %s rows' % ('{:,}'.format(len(prices_df.index))))
-    print(datetime.today().strftime('%Y%m%d'))
+    print(datetime.now().strftime('%Y%m%d'))

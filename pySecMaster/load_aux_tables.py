@@ -63,9 +63,7 @@ class LoadTables(object):
         # In a new DataFrame, only keep the new_df rows that did NOT have a
         #   match to the existing_df
         id_col_name = list(new_df.columns.values)[0]
-        altered_df = new_df[~new_df[id_col_name].isin(combined_df[id_col_name])]
-
-        return altered_df
+        return new_df[~new_df[id_col_name].isin(combined_df[id_col_name])]
 
     def find_tsid(self, table_df):
         """ This only converts the stock's ticker to it's respective symbol_id.
@@ -170,12 +168,11 @@ class LoadTables(object):
                                                         table + '.csv'))
                     table_df = pd.read_csv(file, encoding='ISO-8859-1')
                 except Exception as e:
-                    print('Unable to load the %s csv load file. Skipping it' %
-                          table)
+                    print(f'Unable to load the {table} csv load file. Skipping it')
                     print(e)
                     continue
 
-                if table == 'indices' or table == 'tickers':
+                if table in ['indices', 'tickers']:
                     # ToDo: Re-implement these tables; need symbol_id
                     print('Unable to process indices and tickers table '
                           'since there is no system to create a unique '
@@ -226,14 +223,14 @@ class LoadTables(object):
                           port=self.port, df=new_df, sql_table=table,
                           exists='append', item=table)
 
-                print('Loaded %s into the %s database' %
-                      (table, self.database))
+                print(f'Loaded {table} into the {self.database} database')
 
-        load_tables_excluded = [table for table in tables_to_load
-                                if table not in tables.keys()]
-        if load_tables_excluded:
-            print('Unable to load the following tables: %s' %
-                  (", ".join(load_tables_excluded)))
+        if load_tables_excluded := [
+            table for table in tables_to_load if table not in tables.keys()
+        ]:
+            print(
+                f'Unable to load the following tables: {", ".join(load_tables_excluded)}'
+            )
             print("If the CSV file exists, make sure it's name matches the "
                   "name in the tables dictionary.")
 

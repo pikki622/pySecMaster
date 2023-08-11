@@ -49,5 +49,5 @@ def date_to_iso(row, column):
     try:
         raw_date_obj = datetime.strptime(raw_date, '%Y-%m-%d')
     except TypeError:   # Occurs if there is no date provided ("nan")
-        raw_date_obj = datetime.today()
+        raw_date_obj = datetime.now()
     return raw_date_obj.isoformat()

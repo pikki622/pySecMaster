@@ -48,13 +48,11 @@ def query_all_tsids_from_table(database, table):
                      GROUP BY tsid""" % (table,))
 
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['tsid'])
                 df.drop_duplicates(inplace=True)
 
-                tsid_unique_list = pd.unique((df['tsid']).values)
-                return tsid_unique_list
+                return pd.unique((df['tsid']).values)
             else:
                 raise TypeError('Not able to query any tsid codes in '
                                 'query_all_tsids_from_table')
@@ -90,12 +88,10 @@ def query_all_tsid_prices(database, table, tsid):
                     FROM %s
                     WHERE tsid='%s'""" % (table, tsid)
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 columns = ['data_vendor_id', 'tsid', 'date', 'close', 'high',
                            'low', 'open', 'volume', 'updated_date']
-                df = pd.DataFrame(data, columns=columns)
-                return df
+                return pd.DataFrame(data, columns=columns)
             else:
                 return pd.DataFrame()
     except sqlite3.Error as e:
@@ -133,7 +129,7 @@ def delete_sql_table_rows(database, user, password, host, port, query, table,
     """
 
     if verbose:
-        print('Deleting all rows in %s that fit the provided criteria' % table)
+        print(f'Deleting all rows in {table} that fit the provided criteria')
 
     conn = psycopg2.connect(database=database, user=user, password=password,
                             host=host, port=port)
@@ -180,11 +176,11 @@ def df_to_sql(database, user, password, host, port, df, sql_table, exists,
     """
 
     if verbose:
-        print('Entering the data for %s into the %s database.' %
-              (item, database))
+        print(f'Entering the data for {item} into the {database} database.')
 
-    engine = create_engine('postgresql://%s:%s@%s:%s/%s' %
-                           (user, password, host, port, database))
+    engine = create_engine(
+        f'postgresql://{user}:{password}@{host}:{port}/{database}'
+    )
     conn = engine.connect()
 
     # Try and except block writes the new data to the SQL Database.
@@ -192,8 +188,7 @@ def df_to_sql(database, user, password, host, port, df, sql_table, exists,
         # if_exists options: append new df rows, replace all table values
         df.to_sql(sql_table, conn, if_exists=exists, index=False)
         if verbose:
-            print('Successfully entered the values into the %s database' %
-                  database)
+            print(f'Successfully entered the values into the {database} database')
     except Exception as e:
         print('Error: Unknown issue when adding the DataFrame to the %s '
               'database for %s' % (database, item))
@@ -243,7 +238,7 @@ def insert_df_to_db(database, user, password, host, port, price_df, table,
                           'insert_df_to_db. Make sure the database '
                           'address/name are correct.' % database)
     except Exception as e:
-        raise SystemError('Error occurred in insert_df_to_db: %s' % e)
+        raise SystemError(f'Error occurred in insert_df_to_db: {e}')
 
     # If there is existing data and the new data's date range is more extensive
     #   than the stored data, delete the old data and add the new data
@@ -267,13 +262,9 @@ def insert_df_to_db(database, user, password, host, port, price_df, table,
                 df_to_sql(database=database, user=user, password=password,
                           host=host, port=port, df=price_df, sql_table=table,
                           exists='append', item=tsid)
-            elif del_success == 'failure':
-                # delete_sql_table_rows will issue a failure notice
-                pass
-        else:
-            if verbose:
-                print('Not inserting data for %s because duplicate data was '
-                      'found in the %s database' % (tsid, database))
+        elif verbose:
+            print('Not inserting data for %s because duplicate data was '
+                  'found in the %s database' % (tsid, database))
     else:
         # There is no existing data for this ticker, so insert the data
         df_to_sql(database=database, user=user, password=password, host=host,
@@ -335,11 +326,8 @@ def main(verbose=False):
                             password=postgre_password, host=postgre_host,
                             port=postgre_port, price_df=existing_price_df,
                             table=table, verbose=verbose)
-        else:
-            # Should never happen, since the tsid wouldn't have been used anyway
-            if verbose:
-                print('No existing data found in the Sqlite3 database for %s' %
-                      tsid)
+        elif verbose:
+            print(f'No existing data found in the Sqlite3 database for {tsid}')
 
         if verbose:
             print('Verifying the %s times for %s took %0.2f seconds' %

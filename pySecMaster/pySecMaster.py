@@ -82,7 +82,7 @@ nasdaq_sector_industry_redownload_time = 7
 ###############################################################################
 # Database data download options:
 
-today = datetime.today()
+today = datetime.now()
 
 # Don't change these variables unless you know what you are doing!
 quandl_data_url = ['https://www.quandl.com/api/v1/datasets/', '.csv']
@@ -95,8 +95,9 @@ google_fin_url = {'root': 'http://www.google.com/finance/getprices?',
                   'period': 'p=',    # 20d; 15d is the longest period for min
                   'fields': 'f=d,c,v,o,h,l'}    # order doesn't change anything
 
-yahoo_end_date = ('d=%s&e=%s&f=%s' %
-                  (str(int(today.month - 1)).zfill(2), today.day, today.year))
+yahoo_end_date = (
+    f'd={str(int(today.month - 1)).zfill(2)}&e={today.day}&f={today.year}'
+)
 yahoo_fin_url = {'root': 'http://real-chart.finance.yahoo.com/table.csv?',
                  'ticker': 's=',    # Exchange is added after ticker and '.'
                  'interval': 'g=',  # d, w, m, v: (daily, wkly, mth, dividends)
@@ -216,13 +217,13 @@ def data_download(database_options, quandl_key, download_list, threads=4,
         if source['interval'] == 'daily':
             table = 'daily_prices'
             if source['source'] == 'google':
-                google_fin_url['interval'] = 'i=' + str(60*60*24)
+                google_fin_url['interval'] = f'i={str(60 * 60 * 24)}'
             elif source['source'] == 'yahoo':
                 yahoo_fin_url['interval'] = 'g=d'
         elif source['interval'] == 'minute':
             table = 'minute_prices'
             if source['source'] == 'google':
-                google_fin_url['interval'] = 'i=' + str(60)
+                google_fin_url['interval'] = 'i=60'
             elif source['source'] == 'yahoo':
                 raise SystemError('Yahoo Finance does not provide minute data.')
         else:
@@ -308,11 +309,11 @@ def data_download(database_options, quandl_key, download_list, threads=4,
                 verbose=verbose)
 
         else:
-            print('The %s source is currently not implemented. Skipping it.' %
-                  source['source'])
+            print(
+                f"The {source['source']} source is currently not implemented. Skipping it."
+            )
 
-    print('All available data values have been downloaded for: %s' %
-          download_list)
+    print(f'All available data values have been downloaded for: {download_list}')
 
 
 def post_download_maintenance(database_options, download_list, period=None,
@@ -351,7 +352,7 @@ def post_download_maintenance(database_options, download_list, period=None,
         table = key
 
         if verbose:
-            print('Starting cross validator for %s' % table)
+            print(f'Starting cross validator for {table}')
 
         tsids_df = query_all_active_tsids(
             database=database_options['database'],
@@ -523,16 +524,15 @@ if __name__ == '__main__':
 
     # Try connecting to the postgres database
     while True:
-        db_available = postgres_test(database_options=test_database_options)
-        if db_available:
-            print('%s database is available' %
-                  test_database_options['database'])
+        if db_available := postgres_test(
+            database_options=test_database_options
+        ):
+            print(f"{test_database_options['database']} database is available")
             break
         else:
-            print('%s database is unavailable' %
-                  test_database_options['database'])
+            print(f"{test_database_options['database']} database is unavailable")
             time.sleep(1)
-    
+
     maintenance(database_options=test_database_options,
                 quandl_key=test_quandl_key,
                 quandl_ticker_source=args.quandl_ticker_source,

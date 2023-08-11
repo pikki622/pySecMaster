@@ -35,7 +35,7 @@ def query_existing_qcodes(db_location, table, verbose=False):
 
     start_time = time.time()
     if verbose:
-        print('Retrieving the q_codes from %s...' % db_location)
+        print(f'Retrieving the q_codes from {db_location}...')
 
     conn = sqlite3.connect(db_location)
     try:
@@ -45,8 +45,7 @@ def query_existing_qcodes(db_location, table, verbose=False):
                     FROM %s
                     GROUP BY q_code""" % table
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 df = pd.DataFrame(data, columns=['q_code'])
                 if verbose:
                     print('The query of the existing q_codes for %s took %0.1f '
@@ -73,7 +72,7 @@ def query_qcode_data(db_location, table, qcode, verbose=False):
 
     start_time = time.time()
     if verbose:
-        print('Retrieving all the %s data for %s...' % (table, qcode))
+        print(f'Retrieving all the {table} data for {qcode}...')
 
     conn = sqlite3.connect(db_location)
     try:
@@ -85,8 +84,7 @@ def query_qcode_data(db_location, table, qcode, verbose=False):
                     WHERE q_code='%s'
                     GROUP BY date""" % (table, qcode)
             cur.execute(query)
-            data = cur.fetchall()
-            if data:
+            if data := cur.fetchall():
                 daily_prices_col = ['daily_price_id', 'data_vendor_id',
                                     'q_code', 'date', 'open', 'high', 'low',
                                     'close', 'volume', 'ex_dividend',
@@ -113,8 +111,7 @@ def query_qcode_data(db_location, table, qcode, verbose=False):
                                   'SQL query in query_qcode_data')
     except sqlite3.Error as e:
         conn.rollback()
-        print('Failed to query the price data from %s within query_qcode_data' %
-              table)
+        print(f'Failed to query the price data from {table} within query_qcode_data')
         print(e)
     except conn.OperationalError:
         print('Unable to connect to the SQL Database in query_qcode_data. Make '
@@ -137,10 +134,8 @@ def query_symbology(db_location):
                         WHERE tsid.source='tsid'
                         AND goog.source='quandl_goog'
                         GROUP BY goog.source_id""")
-            data = cur.fetchall()
-            if data:
-                df = pd.DataFrame(data, columns=['tsid', 'goog'])
-                return df
+            if data := cur.fetchall():
+                return pd.DataFrame(data, columns=['tsid', 'goog'])
             else:
                 raise SystemError('Not able to determine the quandl_goog codes '
                                   'from the SQL query in query_symbology')
@@ -173,7 +168,7 @@ def convert_qcode_to_tsid(db_location, price_df, table, qcode):
         tsid = tsid[0]
     else:
         tsid = None
-        print('Unable to find a tsid for %s' % qcode)
+        print(f'Unable to find a tsid for {qcode}')
 
     # Add a tsid column with the appropriate tsid value
     price_df.insert(0, 'tsid', tsid)
@@ -184,7 +179,7 @@ def convert_qcode_to_tsid(db_location, price_df, table, qcode):
 def df_to_sql(db_location, df, sql_table, exists, item, verbose=False):
 
     if verbose:
-        print('Entering the data for %s into %s.' % (item, sql_table))
+        print(f'Entering the data for {item} into {sql_table}.')
 
     conn = sqlite3.connect(db_location)
     # Try and except block writes the new data to the SQL Database.
@@ -194,17 +189,17 @@ def df_to_sql(db_location, df, sql_table, exists, item, verbose=False):
         conn.execute("PRAGMA journal_mode = MEMORY")
         conn.execute("PRAGMA busy_timeout = 60000")
         if verbose:
-            print('Successfully entered %s into %s' % (item, sql_table))
+            print(f'Successfully entered {item} into {sql_table}')
     except conn.Error:
         conn.rollback()
-        print("Failed to insert the DataFrame into %s for %s" %
-              (sql_table, item))
+        print(f"Failed to insert the DataFrame into {sql_table} for {item}")
     except conn.OperationalError:
         raise ValueError('Unable to connect to the SQL Database in df_to_sql. '
                          'Make sure the database address/name are correct.')
     except Exception as e:
-        print('Error: Unknown issue when adding the DataFrame for %s to %s' %
-              (item, sql_table))
+        print(
+            f'Error: Unknown issue when adding the DataFrame for {item} to {sql_table}'
+        )
         print(e)
 
 
@@ -261,7 +256,7 @@ def insert_df_to_db(db_location, price_df, table, verbose=False):
                           'insert_df_to_db. Make sure the database '
                           'address/name are correct.')
     except Exception as e:
-        raise SystemError('Error occurred in insert_df_to_db: %s' % e)
+        raise SystemError(f'Error occurred in insert_df_to_db: {e}')
 
     # If there is existing data and the new data's date range is more extensive
     #   than the stored data, delete the old data and add the new data
@@ -282,13 +277,9 @@ def insert_df_to_db(db_location, price_df, table, verbose=False):
                 # Delete was successful, so insert the new data into the table
                 df_to_sql(df=price_df, db_location=db_location, sql_table=table,
                           exists='append', item=tsid, verbose=False)
-            elif del_success == 'failure':
-                # delete_sql_table_rows will issue a failure notice
-                pass
-        else:
-            if verbose:
-                print('Not inserting data for %s because duplicate data was '
-                      'found in the database' % tsid)
+        elif verbose:
+            print('Not inserting data for %s because duplicate data was '
+                  'found in the database' % tsid)
     else:
         # There is not existing data for this ticker, so insert the data
         df_to_sql(df=price_df, db_location=db_location, sql_table=table,
@@ -329,9 +320,7 @@ def main(verbose=False):
                                                price_df=raw_price_df,
                                                table=table, qcode=ticker)
 
-        tsid = clean_price_df.loc[0, 'tsid']
-        # If there is no tsid, don't attempt to insert the data to the database
-        if tsid:
+        if tsid := clean_price_df.loc[0, 'tsid']:
             # Add the data to the database if there is not existing data
             insert_df_to_db(db_location=new_db_location,
                             price_df=clean_price_df, table=table, verbose=True)

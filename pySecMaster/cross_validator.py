@@ -70,11 +70,8 @@ class CrossValidate:
             database=self.database, user=self.user, password=self.password,
             host=self.host, port=self.port)
 
-        # List of data vendor names to ignore when cross validating the data.
-        #   Relevant when the data source has data that would be considered.
-        self.source_exclude_list = ['pySecMaster_Consensus']
-
         self.source_id_exclude_list = []
+        self.source_exclude_list = ['pySecMaster_Consensus']
         for source in self.source_exclude_list:
             source_id = query_data_vendor_id(
                 database=self.database, user=self.user, password=self.password,
@@ -86,8 +83,9 @@ class CrossValidate:
                 print('Running cross validator for %s tsids only for the prior '
                       '%i day\'s history.' % (len(tsid_list), self.period))
             else:
-                print('Running cross validator for %s tsids for the entire '
-                      'data history.' % (len(tsid_list),))
+                print(
+                    f'Running cross validator for {len(tsid_list)} tsids for the entire data history.'
+                )
 
         self.main()
 
@@ -120,13 +118,13 @@ class CrossValidate:
             host=self.host, port=self.port, table=self.table, tsid=tsid)
 
         unique_sources = tsid_prices_df.index.\
-            get_level_values('data_vendor_id').unique()
+                get_level_values('data_vendor_id').unique()
         unique_dates = tsid_prices_df.index.get_level_values('date').unique()
 
         # If a period is provided, limit the unique_dates list to only those
         #   within the past n period days.
         if self.period:
-            beg_date = datetime.today() - timedelta(days=self.period)
+            beg_date = datetime.now() - timedelta(days=self.period)
             unique_dates = unique_dates[unique_dates > beg_date]
 
         # The consensus_price_df contains the prices from weighted consensus
@@ -193,26 +191,21 @@ class CrossValidate:
                                     source_data[0], 'consensus_weight']
 
                                 try:
-                                    if field_consensus:
-                                        # There's already a value for this field
-                                        if source_data[1] in field_consensus:
-                                            # This source's value has a match in
-                                            #   the current consensus. Increase
-                                            #   weight for this price.
-                                            field_consensus[source_data[1]] += \
+                                    if (
+                                        field_consensus
+                                        and source_data[1] in field_consensus
+                                    ):
+                                        # This source's value has a match in
+                                        #   the current consensus. Increase
+                                        #   weight for this price.
+                                        field_consensus[source_data[1]] += \
                                                 source_weight.iloc[0]
-                                        else:
-                                            # Data value from the source does
-                                            #   not match this field's consensus
-                                            field_consensus[source_data[1]] = \
+                                    else:
+                                        # Data value from the source does
+                                        #   not match this field's consensus
+                                        field_consensus[source_data[1]] = \
                                                 source_weight.iloc[0]
 
-                                    else:
-                                        # Add first price to the field_consensus
-                                        #   dictionary, using price as the key
-                                        #   and the source's weight as the item.
-                                        field_consensus[source_data[1]] = \
-                                            source_weight.iloc[0]
                                 except IndexError:
                                     # No source_weight was found, prob because
                                     #   there was no data_vendor_id for value
@@ -233,7 +226,7 @@ class CrossValidate:
         consensus_price_df.reset_index(inplace=True)
         # Convert the datetime object to an ISO date
         consensus_price_df['date'] = consensus_price_df['date'].\
-            apply(lambda x: x.isoformat())
+                apply(lambda x: x.isoformat())
 
         # Add the vendor id of the pySecMaster_Consensus as a column
         validator_id = query_data_vendor_id(
